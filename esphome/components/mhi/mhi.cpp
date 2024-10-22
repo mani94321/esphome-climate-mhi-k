@@ -14,26 +14,25 @@ namespace esphome {
         const uint8_t MHI_HEAT = 0x03;
         const uint8_t MHI_COOL = 0x06;
         const uint8_t MHI_DRY = 0x05;
-        const uint8_t MHI_FAN = 0x04;
+        const uint8_t MHI_FAN = 0xD4;
 
         // Fan speed
-        const uint8_t MHI_FAN_AUTO = 0x0F;
-        const uint8_t MHI_FAN1 = 0x0E;
-        const uint8_t MHI_FAN2 = 0x0D;
-        const uint8_t MHI_FAN3 = 0x0C;
         const uint8_t MHI_FAN4 = 0x0B;
-        const uint8_t MHI_HIPOWER = 0x07;
+        const uint8_t MHI_FAN_AUTO = 0xE0;
+        const uint8_t MHI_FAN1 = 0xA0;
+        const uint8_t MHI_FAN2 = 0x80;
+        const uint8_t MHI_FAN3 = 0x60;
+        const uint8_t MHI_HIPOWER = 0x20;
         const uint8_t MHI_ECONO = 0x00;
 
         // Vertical swing
-        const uint8_t MHI_VS_SWING = 0xE0;
-        const uint8_t MHI_VS_UP = 0xC0;
-        const uint8_t MHI_VS_MUP = 0xA0;
-        const uint8_t MHI_VS_MIDDLE = 0x80;
-        const uint8_t MHI_VS_MDOWN = 0x60;
-        const uint8_t MHI_VS_DOWN = 0x40;
-        const uint8_t MHI_VS_STOP = 0x20;
-
+        const uint8_t MHI_VS_SWING = 0xA0;
+        const uint8_t MHI_VS_UP = 0x02;
+        const uint8_t MHI_VS_MUP = 0x18;
+        const uint8_t MHI_VS_MIDDLE = 0x10;
+        const uint8_t MHI_VS_MDOWN = 0x08;
+        const uint8_t MHI_VS_DOWN = 0x00;
+        const uint8_t MHI_VS_STOP = 0x1A;
         // Horizontal swing
         const uint8_t MHI_HS_SWING = 0x0F;
         const uint8_t MHI_HS_MIDDLE = 0x0C;
