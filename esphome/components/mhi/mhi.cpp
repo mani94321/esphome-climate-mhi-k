@@ -34,21 +34,24 @@ namespace esphome {
         const uint8_t MHI_VS_DOWN = 0x00;
         const uint8_t MHI_VS_STOP = 0x1A;
         // Horizontal swing
-        const uint8_t MHI_HS_SWING = 0x0F;
-        const uint8_t MHI_HS_MIDDLE = 0x0C;
-        const uint8_t MHI_HS_LEFT = 0x0E;
-        const uint8_t MHI_HS_MLEFT = 0x0D;
-        const uint8_t MHI_HS_MRIGHT = 0x0B;
-        const uint8_t MHI_HS_RIGHT = 0x0A;
-        const uint8_t MHI_HS_STOP = 0x07;
-        const uint8_t MHI_HS_LEFTRIGHT = 0x08;
-        const uint8_t MHI_HS_RIGHTLEFT = 0x09;
 
-        // Only available in Auto, Cool and Heat mode
+        // Horizontal swing
+        const uint8_t MHI_HS_SWING = 0x4C;
+        const uint8_t MHI_HS_MIDDLE = 0x48;
+        const uint8_t MHI_HS_LEFT = 0xC8;
+        const uint8_t MHI_HS_MLEFT = 0x88;
+        const uint8_t MHI_HS_MRIGHT = 0x08;
+        const uint8_t MHI_HS_RIGHT = 0xC4;
+        const uint8_t MHI_HS_STOP = 0xCC;
+        const uint8_t MHI_HS_LEFTRIGHT = 0x84;
+        const uint8_t MHI_HS_RIGHTLEFT = 0x44;
+        const uint8_t MHI_HS_3DAUTO = 0x04;
+
+        // // Only available in Auto, Cool and Heat mode
         const uint8_t MHI_3DAUTO_ON = 0x00;
         const uint8_t MHI_3DAUTO_OFF = 0x12;
 
-        // NOT available in Fan or Dry mode
+        // // NOT available in Fan or Dry mode
         const uint8_t MHI_SILENT_ON = 0x00;
         const uint8_t MHI_SILENT_OFF = 0x80;
 
@@ -66,14 +69,14 @@ namespace esphome {
             // The protocol sends the data twice, read here
             // uint32_t loop_read;
             
-            uint8_t bytes[19] = {};
+            uint8_t bytes[11] = {};
 
             //for (uint16_t loop = 1; loop <= 2; loop++) {
             if (!data.expect_item(MHI_HEADER_MARK, MHI_HEADER_SPACE))
                 return false;
             
             // loop_read = 0;
-            for (uint8_t a_byte = 0; a_byte < 19; a_byte++) {
+            for (uint8_t a_byte = 0; a_byte < 11; a_byte++) {
                 uint8_t byte = 0;
                 for (int8_t a_bit = 0; a_bit < 8; a_bit++) {
                     if (data.expect_item(MHI_BIT_MARK, MHI_ONE_SPACE))
@@ -85,16 +88,14 @@ namespace esphome {
             }
 
             ESP_LOGD(TAG, 
-                "Received bytes 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X",
+                "Received bytes 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X",
                 bytes[0], bytes[1], bytes[2], bytes[3],
                 bytes[4], bytes[5], bytes[6], bytes[7],
-                bytes[8], bytes[9], bytes[10], bytes[11],
-                bytes[12], bytes[13], bytes[14], bytes[15],
-                bytes[16], bytes[17], bytes[18]
+                bytes[8], bytes[9], bytes[10]
             );
 
             // Check the static bytes
-            if (bytes[0] != 0x52 || bytes[1] != 0xAE || bytes[2] != 0xC3 || bytes[3] != 0x1A || bytes[4] != 0xE5) {
+            if (bytes[0] != 0x52 || bytes[1] != 0xAE || bytes[2] != 0xC3 || bytes[3] != 0x26 || bytes[4] != 0xD9) {
                 return false;
             }
 
@@ -104,22 +105,18 @@ namespace esphome {
             if (bytes[5] != (~bytes[6] & 0xFF)
                 || bytes[7] != (~bytes[8] & 0xFF)
                 || bytes[9] != (~bytes[10] & 0xFF)
-                || bytes[11] != (~bytes[12] & 0xFF)
-                || bytes[13] != (~bytes[14] & 0xFF)
-                || bytes[15] != (~bytes[16] & 0xFF)
-                || bytes[17] != (~bytes[18] & 0xFF)
             ) {
                 return false;
             }
             
             ESP_LOGD(TAG, "Passed check 2");
 
-            auto powerMode = bytes[5] & 0x08;
-            auto operationMode = bytes[5] & 0x07;
-            auto temperature = (~bytes[7] & 0x0F) + 17; 
-            auto fanSpeed = bytes[9] & 0x0F;
-            auto swingV = bytes[11] & 0xE0; // ignore the bit for the 3D auto
-            auto swingH = bytes[13] & 0x0F;
+            auto powerMode = bytes[9] & 0x08;
+            auto operationMode = bytes[9] & 0x07;
+            auto temperature = ((~bytes[9] & 0xF0) >> 4) + 17;
+            auto fanSpeed = bytes[7] & 0xE0;
+            auto swingV = ((bytes[5] & 0x02) | (bytes[7] & 0x18));
+            auto swingH = (bytes[5] & 0xCC);
 
             ESP_LOGD(TAG,
                 "Resulting numbers: powerMode=0x%02X operationMode=0x%02X temperature=%d fanSpeed=0x%02X swingV=0x%02X swingH=0x%02X",
@@ -169,15 +166,13 @@ namespace esphome {
 
             // Fan speed
             switch (fanSpeed) {
-                case MHI_FAN1:
-                case MHI_FAN2: // Only to support remote feedback
+                case MHI_FAN1: // Only to support remote feedback
                     this->fan_mode = climate::CLIMATE_FAN_LOW;
                     break;
-                case MHI_FAN3:
+                case MHI_FAN2:
                     this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
                     break;
-                case MHI_FAN4:
-                case MHI_HIPOWER: // Not yet supported. Will be added when ESPHome supports it.
+                case MHI_FAN3:
                     this->fan_mode = climate::CLIMATE_FAN_HIGH;
                     break;
                 case MHI_FAN_AUTO:
@@ -193,7 +188,6 @@ namespace esphome {
                             this->fan_mode = climate::CLIMATE_FAN_DIFFUSE;
                             break;
                     }
-                case MHI_ECONO: // Not yet supported. Will be added when ESPHome supports it.
                 default:
                     this->fan_mode = climate::CLIMATE_FAN_AUTO;
                     break;
@@ -207,11 +201,9 @@ namespace esphome {
 
         void MhiClimate::transmit_state() {
             uint8_t remote_state[] = {
-                0x52, 0xAE, 0xC3, 0x1A,
-                0xE5, 0x90, 0x00, 0xF0,
-                0x00, 0xF0, 0x00, 0x0D,
-                0x00, 0x10, 0x00, 0xFF,
-                0x00, 0x7F, 0x00
+                0x52, 0xAE, 0xC3, 0x26,
+                0xD9, 0x11, 0x00, 0x07,
+                0x00, 0x00, 0x00
             };
 
             // ----------------------
@@ -220,15 +212,12 @@ namespace esphome {
 
             auto operatingMode = MHI_AUTO;
             auto powerMode = MHI_ON;
-            auto cleanMode = 0x60; // always off
+            auto cleanMode = 0x20; // always off
 
             auto temperature = 22;
             auto fanSpeed = MHI_FAN_AUTO;
             auto swingV = MHI_VS_STOP;
-            // auto swingH = MHI_HS_RIGHT;  // custom preferred value for this mode, should be MHI_HS_STOP
             auto swingH = MHI_HS_STOP;
-            auto _3DAuto = MHI_3DAUTO_OFF;
-            auto silentMode = MHI_SILENT_OFF;
 
             // ----------------------
             // Assign the values
@@ -240,12 +229,12 @@ namespace esphome {
                     operatingMode = MHI_COOL;
                     swingV = MHI_VS_UP; // custom preferred value for this mode
                     break;
-                case climate::CLIMATE_MODE_HEAT:
-                    operatingMode = MHI_HEAT;
-                    swingV = MHI_VS_DOWN; // custom preferred value for this mode
+                case climate::CLIMATE_MODE_HEAT_COOL:
+                    operatingMode = MHI_COOL;
+                    swingV = MHI_VS_MIDDLE; // custom preferred value for this mode
                     break;
                 case climate::CLIMATE_MODE_AUTO:
-                    operatingMode = MHI_AUTO;
+                    operatingMode = MHI_COOL;
                     swingV = MHI_VS_MIDDLE; // custom preferred value for this mode
                     break;
                 case climate::CLIMATE_MODE_FAN_ONLY:
@@ -290,22 +279,25 @@ namespace esphome {
                     fanSpeed = MHI_FAN1;
                     break;
                 case climate::CLIMATE_FAN_MEDIUM:
-                    fanSpeed = MHI_FAN3;
+                    fanSpeed = MHI_FAN2;
                     break;
                 case climate::CLIMATE_FAN_HIGH:
-                    fanSpeed = MHI_FAN4;
+                    fanSpeed = MHI_FAN3;
                     break;
                 case climate::CLIMATE_FAN_MIDDLE:
                     fanSpeed = MHI_FAN_AUTO;
                     swingH = MHI_HS_MIDDLE;
+                    swingV = MHI_VS_SWING;
                     break;
                 case climate::CLIMATE_FAN_FOCUS:
-                    fanSpeed = MHI_FAN_AUTO;
+                    fanSpeed = MHI_HIPOWER;
                     swingH = MHI_HS_RIGHTLEFT;
+                    swingV = MHI_VS_SWING;
                     break;
                 case climate::CLIMATE_FAN_DIFFUSE:
-                    fanSpeed = MHI_FAN_AUTO;
+                    fanSpeed = MHI_HIPOWER;
                     swingH = MHI_HS_LEFTRIGHT;
+                    swingV = MHI_VS_SWING;
                     break;
                 case climate::CLIMATE_FAN_AUTO:
                 default:
@@ -318,42 +310,27 @@ namespace esphome {
             // ----------------------
 
             // Power state + operating mode
-            remote_state[5] |= powerMode | operatingMode | cleanMode;
+            remote_state[5] |= swingH | (swingV & 0x02) | cleanMode;
 
             // Temperature
-            remote_state[7] |= (~((uint8_t)temperature - 17) & 0x0F);
+            remote_state[7] |= fanSpeed | (swingV & 0x18);
 
             // Fan speed
-            remote_state[9] |= fanSpeed;
-
-            // Vertical air flow + 3D auto
-            remote_state[11] |= swingV | _3DAuto;
-
-            // Horizontal air flow
-            remote_state[13] |= swingV | swingH;
-
-            // Silent
-            remote_state[15] |= silentMode;
+            remote_state[9] |= operatingMode | powerMode | ((~(((uint8_t)temperature - 17) << 4)) & 0xF0);
 
             // There is no real checksum, but some bytes are inverted
             remote_state[6] = ~remote_state[5];
             remote_state[8] = ~remote_state[7];
             remote_state[10] = ~remote_state[9];
-            remote_state[12] = ~remote_state[11];
-            remote_state[14] = ~remote_state[13];
-            remote_state[16] = ~remote_state[15];
-            remote_state[18] = ~remote_state[17];
 
             // ESP_LOGD(TAG, "Sending MHI target temp: %.1f state: %02X mode: %02X temp: %02X", this->target_temperature, remote_state[5], remote_state[6], remote_state[7]);
 
             auto bytes = remote_state;
             ESP_LOGD(TAG, 
-                "Sent bytes 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X",
+                "Sent bytes 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X",
                 bytes[0], bytes[1], bytes[2], bytes[3],
                 bytes[4], bytes[5], bytes[6], bytes[7],
-                bytes[8], bytes[9], bytes[10], bytes[11],
-                bytes[12], bytes[13], bytes[14], bytes[15],
-                bytes[16], bytes[17], bytes[18]
+                bytes[8], bytes[9], bytes[10]
             );
 
             auto transmit = this->transmitter_->transmit();
